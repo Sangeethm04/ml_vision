@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import structlog
@@ -22,6 +22,7 @@ logger = structlog.get_logger(__name__)
 class RecognitionResult:
     student_id: str
     confidence: float
+    box: Optional[Tuple[int, int, int, int]] = None
 
 
 class FaceRecognizer:
@@ -74,13 +75,14 @@ class FaceRecognizer:
         face_locations = face_recognition.face_locations(frame)
         encodings = face_recognition.face_encodings(frame, face_locations)
         results: List[RecognitionResult] = []
-        for encoding in encodings:
-            result = self._match_encoding(encoding)
-            if result:
-                results.append(result)
+        for encoding, box in zip(encodings, face_locations):
+            match = self._match_encoding(encoding)
+            if match:
+                student_id, confidence = match
+                results.append(RecognitionResult(student_id=student_id, confidence=confidence, box=box))
         return results
 
-    def _match_encoding(self, encoding: np.ndarray) -> Optional[RecognitionResult]:
+    def _match_encoding(self, encoding: np.ndarray) -> Optional[Tuple[str, float]]:
         if not self._known_encodings:
             return None
         distances = face_recognition.face_distance(self._known_encodings, encoding)
@@ -90,7 +92,7 @@ class FaceRecognizer:
             return None
         student_id = self._known_ids[best_index]
         confidence = float(max(0.0, 1.0 - distance))
-        return RecognitionResult(student_id=student_id, confidence=confidence)
+        return student_id, confidence
 
 
 class DeduplicatingRecognizer:
