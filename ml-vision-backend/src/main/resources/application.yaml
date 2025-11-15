@@ -10,7 +10,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update # for dev; use validate / none in prod
+      ddl-auto: update
     show-sql: true
 
   servlet:
@@ -21,6 +21,11 @@ spring:
 server:
   port: 8080
 
+# ML service endpoint
 attendance:
   ml:
-    recognition-url: "http://localhost:8000/recognize" # your Deno / Python endpoint
+    recognition-url: "http://localhost:8000/recognize"
+
+# Where student photos get stored
+app:
+  upload-dir: uploads/students
