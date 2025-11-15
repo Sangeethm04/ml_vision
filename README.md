@@ -92,10 +92,10 @@ pytest==8.2.0
 
 ### Core modules
 
-* `capture.FrameCapture`: opens camera/video/directory and yields frames.
+* `capture.FrameCapture`: opens camera/video/directory and yields frames (with optional `--preview` window).
 * `recognizer.FaceRecognizer` + `DeduplicatingRecognizer`: loads roster encodings and filters duplicates.
 * `api_client.AttendanceApiClient`: wraps REST requests with retries + duplicate handling.
-* `main`: CLI entry; accepts `--session-id`, `--source`, and `--mock-recognizer` for dry runs.
+* `main`: CLI entry; accepts flags like `--session-id`, `--source`, `--mock-recognizer`, and `--dry-run`.
 
 Minimal attendance payload:
 
@@ -120,7 +120,7 @@ api_client.mark_attendance(payload)
 
 ### Testing Guidelines
 
-* Run `pytest` inside `python-vision`; sample dedupe unit test is included.
+* Run `pytest` inside `python-vision`; dedupe + config tests are included.
 * Extend coverage with API mocks (`responses`) and prerecorded frames as needed.
 
 ---
@@ -195,7 +195,9 @@ public class AttendanceController {
 4. **Configure Python app**:
    * `.env` with `API_BASE_URL`, `API_KEY`, `SESSION_ID`, camera config.
    * Preload embeddings referencing student IDs (download from API or maintain offline mapping).
-5. **Run Python agent**: `python -m src.main --session-id <uuid> --source camera`.
+5. **Run Python agent**:
+   * Real mode: `python -m python_vision.main --session-id <uuid> --source camera --preview`.
+   * Offline/dry-run (no Spring API needed): `python -m python_vision.main --dry-run --mock-recognizer --source camera`.
 6. **Front-end (future)**: call `/api/sessions`, `/api/attendance`, subscribe to SSE for live updates.
 
 Error handling guidelines:
