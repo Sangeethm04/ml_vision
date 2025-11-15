@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: ml-vision-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ml_vision
+    username: mluser
+    password: mlpassword
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # for dev; use validate / none in prod
+    show-sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: 8080
+
+attendance:
+  ml:
+    recognition-url: "http://localhost:8000/recognize" # your Deno / Python endpoint
