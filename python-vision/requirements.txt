@@ -6,3 +6,5 @@ python-dotenv==1.0.1
 tenacity==8.2.3
 structlog==24.1.0
 pytest==8.2.0
+Flask==3.0.3
+Werkzeug==3.0.4
