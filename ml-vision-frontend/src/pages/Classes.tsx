@@ -28,7 +28,6 @@ export default function Classes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // ✅ FIXED QUERY — guaranteed to load classes from backend
   const {
     data: classes = [],
     isLoading,
