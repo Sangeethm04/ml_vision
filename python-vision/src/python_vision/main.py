@@ -24,6 +24,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mock-recognizer", action="store_true", help="Enable mock recognition backend")
     parser.add_argument("--dry-run", action="store_true", help="Skip API calls (useful when Spring API is offline)")
     parser.add_argument("--preview", action="store_true", help="Show a live OpenCV window with detections")
+    parser.add_argument(
+        "--process-scale",
+        type=float,
+        default=0.5,
+        help="Scale factor (0-1] applied before running face recognition to improve performance",
+    )
+    parser.add_argument(
+        "--frame-skip",
+        type=int,
+        default=2,
+        help="Only run recognition on every Nth frame (preview still shows every frame)",
+    )
     return parser
 
 
@@ -59,17 +71,41 @@ def run() -> None:
         tolerance=settings.min_confidence,
         use_mock_backend=args.mock_recognizer,
     )
+    logger.info("agent.loaded_roster", faces=len(recognizer._known_ids))
     dedupe = DeduplicatingRecognizer(recognizer, dedupe_seconds=settings.dedupe_seconds)
     api_client = None if args.dry_run else AttendanceApiClient(settings.api_base_url, settings.api_key)
 
+    frame_counter = 0
+    frame_skip = max(1, args.frame_skip)
+
     with FrameCapture(frame_source) as capture:
         for frame in capture.frames():
+            frame_counter += 1
+            should_process = frame_skip == 1 or frame_counter % frame_skip == 0
+            processing_frame = frame
+            scale_factor = max(0.1, min(args.process_scale, 1.0))
+            if should_process and scale_factor < 1.0:
+                processing_frame = cv2.resize(frame, (0, 0), fx=scale_factor, fy=scale_factor)
+
             now = time.time()
-            matches = dedupe.identify(frame, timestamp=now)
+            matches = dedupe.identify(processing_frame, timestamp=now) if should_process else []
+
+            if should_process and scale_factor < 1.0:
+                for match in matches:
+                    if match.box:
+                        top, right, bottom, left = match.box
+                        match.box = (
+                            int(top / scale_factor),
+                            int(right / scale_factor),
+                            int(bottom / scale_factor),
+                            int(left / scale_factor),
+                        )
+
             if args.preview:
                 if not show_preview_frame(frame, matches):
                     logger.info("agent.preview_exit")
                     break
+
             if not matches:
                 continue
             for match in matches:

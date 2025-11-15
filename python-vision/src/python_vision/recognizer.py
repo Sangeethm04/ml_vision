@@ -72,22 +72,32 @@ class FaceRecognizer:
     def identify(self, frame) -> List[RecognitionResult]:
         if self.use_mock_backend:
             return []
+        frame_id = id(frame)
+        logger.debug("recognizer.detect_start", frame_id=frame_id)
         face_locations = face_recognition.face_locations(frame)
+        logger.debug("recognizer.detect_complete", frame_id=frame_id, faces=len(face_locations))
         encodings = face_recognition.face_encodings(frame, face_locations)
         results: List[RecognitionResult] = []
         for encoding, box in zip(encodings, face_locations):
-            match = self._match_encoding(encoding)
+            match = self._match_encoding(encoding, frame_id=frame_id)
             if match:
                 student_id, confidence = match
                 results.append(RecognitionResult(student_id=student_id, confidence=confidence, box=box))
         return results
 
-    def _match_encoding(self, encoding: np.ndarray) -> Optional[Tuple[str, float]]:
+    def _match_encoding(self, encoding: np.ndarray, frame_id: int) -> Optional[Tuple[str, float]]:
         if not self._known_encodings:
             return None
         distances = face_recognition.face_distance(self._known_encodings, encoding)
         best_index = int(np.argmin(distances))
         distance = distances[best_index]
+        logger.debug(
+            "recognizer.match_result",
+            frame_id=frame_id,
+            best_student=self._known_ids[best_index],
+            distance=float(distance),
+            tolerance=self.tolerance,
+        )
         if distance > self.tolerance:
             return None
         student_id = self._known_ids[best_index]
