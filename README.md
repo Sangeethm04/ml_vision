@@ -4,6 +4,10 @@ End-to-end blueprint for a classroom attendance platform that combines a Python-
 
 ---
 
+## Running the app
+docker-compose up -d
+mvn spring-boot:run
+
 ## System Architecture
 
 ```
