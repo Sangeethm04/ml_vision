@@ -1,11 +1,17 @@
-// API Base URL - configure via environment variable
+// ============================================================================
+// API Base URL (Spring Boot)
+// ============================================================================
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
-// Types matching your backend DTOs
+// ============================================================================
+// Types matching backend DTOs & entities
+// ============================================================================
+
 export interface Student {
   id: string;
-  externalId: string;
+  externalId: string; // ML uses this!
   firstName: string;
   lastName: string;
   email: string;
@@ -28,14 +34,14 @@ export interface AttendanceRecord {
 }
 
 export interface RecognizedStudent {
-  student_id: string;
+  student_id: string; // Python returns this (externalId)
   confidence: number;
   position: string;
 }
 
-// ----------------------
+// ============================================================================
 // STUDENT API
-// ----------------------
+// ============================================================================
 
 export const studentApi = {
   getAll: async (): Promise<Student[]> => {
@@ -50,17 +56,17 @@ export const studentApi = {
     return res.json();
   },
 
-  /** CREATE STUDENT WITH PHOTO */
+  /** CREATE (multipart w/ photo) */
   createWithPhoto: async (formData: FormData): Promise<Student> => {
     const res = await fetch(`${API_BASE_URL}/students`, {
       method: "POST",
-      body: formData, // MUST NOT set Content-Type manually
+      body: formData,
     });
     if (!res.ok) throw new Error("Failed to create student");
     return res.json();
   },
 
-  /** UPDATE STUDENT WITH PHOTO */
+  /** UPDATE (multipart w/ photo) */
   updateWithPhoto: async (id: string, formData: FormData): Promise<Student> => {
     const res = await fetch(`${API_BASE_URL}/students/${id}`, {
       method: "PUT",
@@ -70,7 +76,6 @@ export const studentApi = {
     return res.json();
   },
 
-  /** DELETE */
   delete: async (id: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/students/${id}`, {
       method: "DELETE",
@@ -79,9 +84,9 @@ export const studentApi = {
   },
 };
 
-// ----------------------
-// CLASS API
-// ----------------------
+// ============================================================================
+// CLASS + ROSTER API
+// ============================================================================
 
 export const classApi = {
   getAll: async (): Promise<Class[]> => {
@@ -123,43 +128,73 @@ export const classApi = {
     if (!res.ok) throw new Error("Failed to delete class");
   },
 
+  /** GET roster for a class */
   getRoster: async (classId: string): Promise<Student[]> => {
     const res = await fetch(`${API_BASE_URL}/classes/${classId}/roster`);
     if (!res.ok) throw new Error("Failed to fetch roster");
     return res.json();
   },
 
-  addStudent: async (classId: string, studentId: string): Promise<void> => {
+  /** ADD student to roster */
+  addToRoster: async (classId: string, studentId: string): Promise<void> => {
     const res = await fetch(
-      `${API_BASE_URL}/classes/${classId}/add-student/${studentId}`,
-      {
-        method: "POST",
-      }
+      `${API_BASE_URL}/classes/${classId}/roster/${studentId}`,
+      { method: "POST" }
     );
     if (!res.ok) throw new Error("Failed to add student to class");
   },
+
+  /** REMOVE student from roster */
+  removeFromRoster: async (
+    classId: string,
+    studentId: string
+  ): Promise<void> => {
+    const res = await fetch(
+      `${API_BASE_URL}/classes/${classId}/roster/${studentId}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) throw new Error("Failed to remove student from class");
+  },
 };
 
-// ----------------------
-// ATTENDANCE API
-// ----------------------
+// ============================================================================
+// ATTENDANCE API — Python Vision + Spring Backend
+// ============================================================================
+
+/** Step 1 — Send frame to Python ML */
+async function sendToPython(file: File) {
+  const fd = new FormData();
+  fd.append("image", file);
+
+  const res = await fetch("http://localhost:5001/recognize", {
+    method: "POST",
+    body: fd,
+  });
+
+  if (!res.ok) throw new Error("Python recognition failed");
+  return res.json(); // { recognized: [...] }
+}
+
+/** Step 2 — Send recognized list to Spring */
+async function sendToSpring(classId: string, recognized: RecognizedStudent[]) {
+  const res = await fetch(
+    `${API_BASE_URL}/attendance/batch?classId=${classId}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recognized }),
+    }
+  );
+
+  if (!res.ok) throw new Error("Spring attendance failed");
+  return res.json();
+}
 
 export const attendanceApi = {
-  submitFrame: async (
-    image: File,
-    classId: string
-  ): Promise<{ recognized: RecognizedStudent[] }> => {
-    const formData = new FormData();
-    formData.append("image", image);
-    formData.append("classId", classId);
-
-    const res = await fetch(`${API_BASE_URL}/camera/frame`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!res.ok) throw new Error("Failed to submit frame");
-    return res.json();
+  /** Submit frame -> python -> spring */
+  submitFrame: async (file: File, classId: string) => {
+    const vision = await sendToPython(file);
+    return await sendToSpring(classId, vision.recognized);
   },
 
   getByClass: async (classId: string): Promise<AttendanceRecord[]> => {
@@ -172,7 +207,7 @@ export const attendanceApi = {
     const res = await fetch(
       `${API_BASE_URL}/attendance/class/${classId}/today`
     );
-    if (!res.ok) throw new Error("Failed to fetch today attendance");
+    if (!res.ok) throw new Error("Failed to fetch today's attendance");
     return res.json();
   },
 
@@ -181,25 +216,11 @@ export const attendanceApi = {
     if (!res.ok) throw new Error("Failed to fetch student attendance");
     return res.json();
   },
-
-  mark: async (data: {
-    classId: string;
-    studentId: string;
-    confidence: number;
-  }): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/attendance/mark`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    if (!res.ok) throw new Error("Failed to mark attendance");
-  },
 };
 
-// ----------------------
+// ============================================================================
 // HEALTH CHECK
-// ----------------------
+// ============================================================================
 
 export const healthCheck = async (): Promise<{ status: string }> => {
   const res = await fetch(`${API_BASE_URL}/health`);

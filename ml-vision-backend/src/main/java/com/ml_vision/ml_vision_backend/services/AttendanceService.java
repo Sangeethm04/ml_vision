@@ -19,39 +19,37 @@ public class AttendanceService {
 
     public void recordAttendance(String classId, MlRecognizedStudent recognized) {
 
-        // 1. Load class
         CourseClass courseClass = classRepo.findById(classId)
                 .orElseThrow(() -> new RuntimeException("Class not found"));
 
-        // 2. Load student by external ID
-        Student student = studentRepo.findByExternalId(recognized.getStudent_id())
+        Student student = studentRepo.findByExternalId(recognized.getStudentId())
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        // 3. Ensure student is enrolled
-        if (!rosterRepo.existsByCourseClassAndStudent(courseClass, student)) {
-            throw new RuntimeException("Student not in roster");
-        }
+        // verify enrollment
+        boolean inRoster = rosterRepo.existsByCourseClassIdAndStudentExternalId(
+                classId, student.getExternalId());
 
-        // 4. Prevent duplicate attendance marks today
+        if (!inRoster)
+            throw new RuntimeException("Student not in roster");
+
+        // restrict one per day
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime start = now.toLocalDate().atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
-        boolean alreadyMarked = recordRepo.existsByStudentAndCourseClassAndTimestampBetween(
+        boolean exists = recordRepo.existsByStudentAndCourseClassAndTimestampBetween(
                 student, courseClass, start, end);
 
-        if (alreadyMarked)
+        if (exists)
             return;
 
-        // 5. Save new attendance record
-        AttendanceRecord record = AttendanceRecord.builder()
-                .student(student)
-                .courseClass(courseClass)
-                .timestamp(now)
-                .confidence(recognized.getConfidence())
-                .position(recognized.getPosition())
-                .status(AttendanceStatus.PRESENT)
-                .build();
+        AttendanceRecord record = new AttendanceRecord();
+        record.setStudent(student);
+        record.setCourseClass(courseClass);
+        record.setTimestamp(now);
+        record.setConfidence(recognized.getConfidence());
+        record.setPosition(recognized.getPosition());
+        record.setStatus(AttendanceStatus.PRESENT);
 
         recordRepo.save(record);
     }

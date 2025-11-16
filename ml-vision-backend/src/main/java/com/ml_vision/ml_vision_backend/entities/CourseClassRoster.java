@@ -1,16 +1,20 @@
 package com.ml_vision.ml_vision_backend.entities;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import org.hibernate.annotations.UuidGenerator;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Entity
-@Table(name = "course_class_roster")
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class CourseClassRoster {
 
     @Id
-    @UuidGenerator
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
     @ManyToOne
@@ -18,6 +22,6 @@ public class CourseClassRoster {
     private CourseClass courseClass;
 
     @ManyToOne
-    @JoinColumn(name = "student_id")
+    @JoinColumn(name = "student_external_id", referencedColumnName = "externalId")
     private Student student;
 }
