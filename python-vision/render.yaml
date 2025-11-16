@@ -5,10 +5,10 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      pip install -r requirements.txt
-    startCommand: |
-      export PYTHONPATH=src
-      python -m python_vision.server
+      apt-get update && apt-get install -y --no-install-recommends cmake build-essential
+      pip install --upgrade pip
+      pip install -r requirements.txt --only-binary=numpy
+    startCommand: PYTHONPATH=src python -m python_vision.server
     envVars:
       - key: PORT
         value: "5001"
