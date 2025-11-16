@@ -22,7 +22,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 
-const navItems = [
+export const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Students", url: "/students", icon: Users },
   { title: "Classes", url: "/classes", icon: BookOpen },
@@ -50,7 +50,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex flex-col">
               <span className="text-lg font-bold text-sidebar-foreground">Vision</span>
-              <span className="text-xs text-muted-foreground">Face Recognition</span>
+              <span className="text-xs text-muted-foreground">Attendance Tracker</span>
             </div>
           )}
         </div>

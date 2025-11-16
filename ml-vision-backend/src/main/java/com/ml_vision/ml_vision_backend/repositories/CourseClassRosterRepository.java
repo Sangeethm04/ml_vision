@@ -9,9 +9,11 @@ import java.util.List;
 
 public interface CourseClassRosterRepository extends JpaRepository<CourseClassRoster, String> {
 
-    boolean existsByCourseClassIdAndStudentExternalId(String classId, String externalId);
+    boolean existsByCourseClass_IdAndStudent_ExternalId(String classId, String externalId);
 
-    void deleteByCourseClassIdAndStudentExternalId(String classId, String externalId);
+    List<CourseClassRoster> findByCourseClassId(String classId);
+
+    void deleteByCourseClass_IdAndStudent_ExternalId(String classId, String externalId);
 
     @Query("""
         SELECT r.student

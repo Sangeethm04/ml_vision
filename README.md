@@ -46,7 +46,8 @@ cd python-vision
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp example.env .env  # edit API_BASE_URL, API_KEY, SESSION_ID, etc.
-python -m python_vision.main --source 0
+python -m python_vision.main --source 0 # to run by itself
+python -m python_vision.server # to run with app                   
 
 # Spring API
 cd spring-api

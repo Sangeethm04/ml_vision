@@ -28,9 +28,16 @@ export interface Class {
 export interface AttendanceRecord {
   id: string;
   studentId: string;
+  studentExternalId: string;
+  studentName: string;
   classId: string;
+  className: string;
   timestamp: string;
   confidence: number;
+  status: string;
+  position?: string;
+  sessionId: string;
+  sessionStartedAt: string;
 }
 
 export interface RecognizedStudent {
@@ -136,9 +143,9 @@ export const classApi = {
   },
 
   /** ADD student to roster */
-  addToRoster: async (classId: string, studentId: string): Promise<void> => {
+  addToRoster: async (classId: string, studentExternalId: string): Promise<void> => {
     const res = await fetch(
-      `${API_BASE_URL}/classes/${classId}/roster/${studentId}`,
+      `${API_BASE_URL}/classes/${classId}/roster/${studentExternalId}`,
       { method: "POST" }
     );
     if (!res.ok) throw new Error("Failed to add student to class");
@@ -147,10 +154,10 @@ export const classApi = {
   /** REMOVE student from roster */
   removeFromRoster: async (
     classId: string,
-    studentId: string
+    studentExternalId: string
   ): Promise<void> => {
     const res = await fetch(
-      `${API_BASE_URL}/classes/${classId}/roster/${studentId}`,
+      `${API_BASE_URL}/classes/${classId}/roster/${studentExternalId}`,
       { method: "DELETE" }
     );
     if (!res.ok) throw new Error("Failed to remove student from class");
@@ -176,9 +183,16 @@ async function sendToPython(file: File) {
 }
 
 /** Step 2 — Send recognized list to Spring */
-async function sendToSpring(classId: string, recognized: RecognizedStudent[]) {
+async function sendToSpring(
+  classId: string,
+  sessionId: string,
+  sessionStartedAt: string,
+  recognized: RecognizedStudent[]
+) {
   const res = await fetch(
-    `${API_BASE_URL}/attendance/batch?classId=${classId}`,
+    `${API_BASE_URL}/attendance/batch?classId=${classId}&sessionId=${sessionId}&sessionStartedAt=${encodeURIComponent(
+      sessionStartedAt
+    )}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -192,13 +206,20 @@ async function sendToSpring(classId: string, recognized: RecognizedStudent[]) {
 
 export const attendanceApi = {
   /** Submit frame -> python -> spring */
-  submitFrame: async (file: File, classId: string) => {
+  submitFrame: async (
+    file: File,
+    classId: string,
+    sessionId: string,
+    sessionStartedAt: string
+  ): Promise<AttendanceRecord[]> => {
     const vision = await sendToPython(file);
-    return await sendToSpring(classId, vision.recognized);
+    return await sendToSpring(classId, sessionId, sessionStartedAt, vision.recognized);
   },
 
-  getByClass: async (classId: string): Promise<AttendanceRecord[]> => {
-    const res = await fetch(`${API_BASE_URL}/attendance/class/${classId}`);
+  getByClass: async (classId: string, sessionId?: string): Promise<AttendanceRecord[]> => {
+    const res = await fetch(
+      `${API_BASE_URL}/attendance/class/${classId}${sessionId ? `?sessionId=${sessionId}` : ""}`
+    );
     if (!res.ok) throw new Error("Failed to fetch attendance");
     return res.json();
   },
@@ -214,6 +235,21 @@ export const attendanceApi = {
   getByStudent: async (studentId: string): Promise<AttendanceRecord[]> => {
     const res = await fetch(`${API_BASE_URL}/attendance/student/${studentId}`);
     if (!res.ok) throw new Error("Failed to fetch student attendance");
+    return res.json();
+  },
+
+  markAbsences: async (
+    classId: string,
+    sessionId: string,
+    sessionStartedAt: string
+  ): Promise<AttendanceRecord[]> => {
+    const res = await fetch(
+      `${API_BASE_URL}/attendance/mark-absent?classId=${classId}&sessionId=${sessionId}&sessionStartedAt=${encodeURIComponent(
+        sessionStartedAt
+      )}`,
+      { method: "POST" }
+    );
+    if (!res.ok) throw new Error("Failed to mark absences");
     return res.json();
   },
 };

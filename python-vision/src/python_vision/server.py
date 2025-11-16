@@ -17,6 +17,7 @@ from flask_cors import CORS  # <-- CORS ENABLED
 
 from .config import Settings
 from .recognizer import FaceRecognizer, RecognitionResult
+from .roster_sync import sync_roster
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +25,8 @@ logger = structlog.get_logger(__name__)
 # Load settings + recognizer
 # ----------------------------------------------------
 settings = Settings.load(require_api=False)
+# Sync roster photos from Spring backend before loading recognizer
+sync_roster(settings)
 
 recognizer = FaceRecognizer(
     roster_dir=settings.roster_dir,      # folder containing .jpg files
@@ -43,6 +46,15 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "timestamp": time.time()})
+
+
+@app.post("/reload")
+def reload_roster():
+    """Sync roster from Spring backend and reload recognizer encodings."""
+    downloaded = sync_roster(settings)
+    recognizer.reload()
+    logger.info("flask_server.reloaded_roster", photos=downloaded, faces=len(recognizer._known_ids))
+    return jsonify({"status": "reloaded", "downloaded": downloaded, "faces": len(recognizer._known_ids)})
 
 
 # ----------------------------------------------------

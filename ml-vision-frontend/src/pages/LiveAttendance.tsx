@@ -4,23 +4,36 @@ import { Camera, Square, PlayCircle, CheckCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { classApi, attendanceApi, RecognizedStudent } from "@/services/api";
+import { classApi, attendanceApi, AttendanceRecord } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export default function LiveAttendance() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [selectedClass, setSelectedClass] = useState("");
-  const [recognized, setRecognized] = useState<RecognizedStudent[]>([]);
+  const [sessionId, setSessionId] = useState("");
+  const [sessionStartedAt, setSessionStartedAt] = useState("");
+  const sessionIdRef = useRef("");
+  const sessionStartedAtRef = useRef("");
+  const [savedAttendance, setSavedAttendance] = useState<AttendanceRecord[]>(
+    []
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const captureInterval = useRef<number>();
   const { toast } = useToast();
 
   const { data: classes = [] } = useQuery({
-    queryKey: ['classes'],
+    queryKey: ["classes"],
     queryFn: classApi.getAll,
   });
 
@@ -31,30 +44,51 @@ export default function LiveAttendance() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream;
+
       setIsCapturing(true);
+      const newSessionId = crypto.randomUUID();
+      const startAt = new Date().toISOString();
+      setSessionId(newSessionId);
+      setSessionStartedAt(startAt);
+      sessionIdRef.current = newSessionId;
+      sessionStartedAtRef.current = startAt;
+
       captureInterval.current = window.setInterval(() => {
         handleCaptureFrame();
-      }, 1000); // every 1s
+      }, 1000);
+
       toast({ title: "Camera started" });
     } catch (error) {
       toast({ title: "Failed to access camera", variant: "destructive" });
     }
   };
 
-  const handleStopCapture = () => {
+  const handleStopCapture = async () => {
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
     }
+
     if (captureInterval.current) {
       clearInterval(captureInterval.current);
       captureInterval.current = undefined;
     }
+
+    if (sessionId && sessionStartedAt) {
+      try {
+        await attendanceApi.markAbsences(selectedClass, sessionId, sessionStartedAt);
+      } catch (err) {
+        toast({ title: "Failed to mark absences", variant: "destructive" });
+      }
+    }
+
     setIsCapturing(false);
-    setRecognized([]);
+    setSessionId("");
+    setSessionStartedAt("");
+    sessionIdRef.current = "";
+    sessionStartedAtRef.current = "";
+    setSavedAttendance([]);
   };
 
   useEffect(() => {
@@ -64,36 +98,51 @@ export default function LiveAttendance() {
   }, []);
 
   const handleCaptureFrame = async () => {
-  if (!videoRef.current || !selectedClass) return;
+    const activeSessionId = sessionIdRef.current;
+    const activeSessionStartedAt = sessionStartedAtRef.current;
+    if (!videoRef.current || !selectedClass || !activeSessionId || !activeSessionStartedAt)
+      return;
 
-  setIsProcessing(true);
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(videoRef.current, 0, 0);
+    setIsProcessing(true);
 
-    const blob = await new Promise<Blob>((resolve) =>
-      canvas.toBlob((b) => resolve(b!), 'image/jpeg')
-    );
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(videoRef.current, 0, 0);
 
-    const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((b) => resolve(b!), "image/jpeg")
+      );
 
-    const result = await attendanceApi.submitFrame(file, selectedClass);
+      const file = new File([blob], "frame.jpg", { type: "image/jpeg" });
 
-    setRecognized(result.recognized);
-    toast({
-      title: `Recognized ${result.recognized.length} student(s)`,
-      description: "Attendance marked successfully"
-    });
-  } catch (error) {
-    toast({ title: "Failed to process frame", variant: "destructive" });
-  } finally {
-    setIsProcessing(false);
-  }
-};
+      const saved = await attendanceApi.submitFrame(
+        file,
+        selectedClass,
+        activeSessionId,
+        activeSessionStartedAt
+      );
 
+      setSavedAttendance((prev) => {
+        const map = new Map(prev.map((r) => [r.id, r]));
+        saved.forEach((r) => map.set(r.id, r));
+        return Array.from(map.values()).sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+      });
+
+      // toast({
+      //   title: `Recognized ${result.recognized.length} student(s)`,
+      //   description: "Attendance marked successfully",
+      // });
+    } catch (error) {
+      //toast({ title: "Failed to process frame", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -101,7 +150,9 @@ export default function LiveAttendance() {
         <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
           Live Attendance
         </h1>
-        <p className="text-muted-foreground mt-2">Capture attendance using face recognition</p>
+        <p className="text-muted-foreground mt-2">
+          Capture attendance using face recognition
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -133,13 +184,18 @@ export default function LiveAttendance() {
                   ref={videoRef}
                   autoPlay
                   playsInline
-                  className={`absolute inset-0 w-full h-full object-cover ${!isCapturing ? 'hidden' : ''}`}
+                  className={`absolute inset-0 w-full h-full object-cover ${
+                    !isCapturing ? "hidden" : ""
+                  }`}
                 />
                 {!isCapturing && (
                   <Camera className="h-24 w-24 text-muted-foreground" />
                 )}
                 <div className="absolute top-4 right-4">
-                  <Badge variant={isCapturing ? "default" : "secondary"} className="gap-2">
+                  <Badge
+                    variant={isCapturing ? "default" : "secondary"}
+                    className="gap-2"
+                  >
                     {isCapturing ? (
                       <>
                         <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
@@ -156,7 +212,7 @@ export default function LiveAttendance() {
 
           <div className="flex gap-4">
             {!isCapturing ? (
-              <Button 
+              <Button
                 className="flex-1 bg-gradient-primary text-white"
                 size="lg"
                 onClick={handleStartCapture}
@@ -167,7 +223,7 @@ export default function LiveAttendance() {
               </Button>
             ) : (
               <>
-                <Button 
+                <Button
                   className="flex-1 bg-gradient-primary text-white"
                   size="lg"
                   onClick={handleCaptureFrame}
@@ -176,7 +232,7 @@ export default function LiveAttendance() {
                   <Camera className="h-5 w-5 mr-2" />
                   {isProcessing ? "Processing..." : "Capture Frame"}
                 </Button>
-                <Button 
+                <Button
                   variant="destructive"
                   size="lg"
                   onClick={handleStopCapture}
@@ -193,39 +249,53 @@ export default function LiveAttendance() {
           <Card className="border-border shadow-card">
             <CardHeader>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Recognized Students</h3>
-                <Badge variant="secondary">{recognized.length} Detected</Badge>
+                <h3 className="text-lg font-semibold">Recorded Attendance</h3>
+                <Badge variant="secondary">
+                  {savedAttendance.length} Saved
+                </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              {recognized.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No students detected yet</p>
+              {savedAttendance.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No attendance recorded yet
+                </p>
               ) : (
                 <div className="space-y-3">
-                  {recognized.map((student, index) => (
+                  {savedAttendance.map((record, index) => (
                     <motion.div
-                      key={index}
+                      key={record.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
+                      transition={{ delay: index * 0.05 }}
                       className="flex items-center justify-between p-3 rounded-lg bg-gradient-card border border-border"
                     >
                       <div className="flex items-center gap-3">
                         <CheckCircle className="h-5 w-5 text-primary" />
                         <div>
-                          <p className="font-medium">Student {student.student_id}</p>
+                          <p className="font-medium">
+                            {record.studentName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(record.timestamp), "PPP p")}
+                          </p>
                           <div className="flex items-center gap-2">
-                            <Progress value={student.confidence * 100} className="w-20 h-2" />
+                            <Progress
+                              value={record.confidence * 100}
+                              className="w-20 h-2"
+                            />
                             <span className="text-xs text-muted-foreground">
-                              {(student.confidence * 100).toFixed(0)}%
+                              {(record.confidence * 100).toFixed(0)}%
                             </span>
                           </div>
-                          {student.position && (
-                            <span className="text-xs text-muted-foreground">{student.position}</span>
+                          {record.position && (
+                            <span className="text-xs text-muted-foreground">
+                              {record.position}
+                            </span>
                           )}
                         </div>
                       </div>
-                      <Badge variant="default">Detected</Badge>
+                      <Badge variant="default">#{record.id.slice(0, 8)}</Badge>
                     </motion.div>
                   ))}
                 </div>

@@ -14,6 +14,7 @@ from .api_client import AttendanceApiClient, AttendancePayload
 from .capture import FrameCapture
 from .config import Settings
 from .recognizer import DeduplicatingRecognizer, FaceRecognizer
+from .roster_sync import sync_roster
 
 logger = structlog.get_logger(__name__)
 
@@ -72,6 +73,9 @@ def run() -> None:
         frame_source=frame_source,
         roster_dir=str(settings.roster_dir),
     )
+
+    # Pull latest roster photos from Spring backend
+    sync_roster(settings)
 
     recognizer = FaceRecognizer(
         roster_dir=settings.roster_dir,

@@ -3,7 +3,14 @@ package com.ml_vision.ml_vision_backend.services;
 import com.ml_vision.ml_vision_backend.entities.Student;
 import com.ml_vision.ml_vision_backend.repositories.StudentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -17,6 +24,10 @@ import java.util.UUID;
 public class StudentService {
 
     private final StudentRepository studentRepository;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${python.reload.url:http://localhost:5001/reload}")
+    private String pythonReloadUrl;
 
     private static final String RELATIVE_UPLOAD_DIR = "/uploads/student_photos/";
 
@@ -34,10 +45,12 @@ public class StudentService {
         student.setEmail(email);
 
         if (photo != null && !photo.isEmpty()) {
-            student.setPhotoUrl(savePhoto(photo));
+            student.setPhotoUrl(savePhoto(photo, externalId));
         }
 
-        return studentRepository.save(student);
+        Student saved = studentRepository.save(student);
+        notifyPythonReload();
+        return saved;
     }
 
     public Student updateStudent(
@@ -57,10 +70,12 @@ public class StudentService {
         student.setEmail(email);
 
         if (photo != null && !photo.isEmpty()) {
-            student.setPhotoUrl(savePhoto(photo));
+            student.setPhotoUrl(savePhoto(photo, externalId));
         }
 
-        return studentRepository.save(student);
+        Student saved = studentRepository.save(student);
+        notifyPythonReload();
+        return saved;
     }
 
     public Iterable<Student> getAllStudents() {
@@ -76,7 +91,7 @@ public class StudentService {
         studentRepository.deleteById(id);
     }
 
-    private String savePhoto(MultipartFile file) {
+    private String savePhoto(MultipartFile file, String externalId) {
         try {
             String rootDir = System.getProperty("user.dir");
             String fullUploadPath = rootDir + RELATIVE_UPLOAD_DIR;
@@ -84,9 +99,12 @@ public class StudentService {
             Files.createDirectories(Paths.get(fullUploadPath));
 
             String ext = getExtension(file.getOriginalFilename());
-            String fileName = UUID.randomUUID() + ext;
+            String fileName = externalId + ext;
 
             File dest = new File(fullUploadPath + fileName);
+            if (dest.exists()) {
+                dest.delete();
+            }
             file.transferTo(dest);
 
             return RELATIVE_UPLOAD_DIR + fileName;
@@ -101,5 +119,17 @@ public class StudentService {
             return ".jpg";
         }
         return name.substring(name.lastIndexOf("."));
+    }
+
+    private void notifyPythonReload() {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(pythonReloadUrl, HttpMethod.POST, entity, String.class);
+            System.out.println("Notified python reload: " + response.getStatusCode());
+        } catch (Exception ex) {
+            System.err.println("Failed to notify python reload: " + ex.getMessage());
+        }
     }
 }

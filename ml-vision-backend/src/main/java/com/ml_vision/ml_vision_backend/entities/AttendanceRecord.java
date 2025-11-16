@@ -31,4 +31,8 @@ public class AttendanceRecord {
 
     private double confidence;
     private String position;
+
+    // identifies a capture session (e.g., each time "Start Capture" is pressed)
+    private String sessionId;
+    private LocalDateTime sessionStartedAt;
 }

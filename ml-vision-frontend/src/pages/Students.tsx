@@ -264,11 +264,7 @@ export default function Students() {
                 </CardHeader>
 
                 <CardContent className="pt-4 space-y-2">
-                  <Button variant="outline" className="w-full" onClick={() => openViewProfile(s)}>
-                    View
-                  </Button>
-
-                  <Button className="w-full bg-gradient-primary text-white" onClick={() => openEditStudent(s)}>
+                  <Button variant="outline" className="w-full  text-white" onClick={() => openEditStudent(s)}>
                     Edit
                   </Button>
 
@@ -353,7 +349,7 @@ export default function Students() {
                     variant="destructive"
                     size="sm"
                     onClick={async () => {
-                      await classApi.removeFromRoster(cls.id, selectedStudent.id);
+                      await classApi.removeFromRoster(cls.id, selectedStudent.externalId);
                       openManageRoster(selectedStudent);
                     }}
                   >
@@ -365,13 +361,13 @@ export default function Students() {
               <h3 className="font-medium mt-6">Add to Class</h3>
 
               <select
-                className="w-full border p-2 rounded-md"
+                className="w-full border p-2 rounded-md text-black"
                 value={selectedClassId}
                 onChange={(e) => setSelectedClassId(e.target.value)}
               >
-                <option value="">Select class…</option>
+                <option value="" className="text-black">Select class…</option>
                 {allClasses.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
+                  <option key={cls.id} value={cls.id } className="text-black">
                     {cls.name} ({cls.code})
                   </option>
                 ))}

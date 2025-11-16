@@ -48,6 +48,12 @@ class FaceRecognizer:
         self._known_ids: List[str] = []
         self._load_known_faces()
 
+    def reload(self) -> None:
+        """Reload known faces from disk (e.g., after roster sync)."""
+        self._known_encodings.clear()
+        self._known_ids.clear()
+        self._load_known_faces()
+
     def _load_known_faces(self) -> None:
         if self.use_mock_backend:
             logger.warning("recognizer.mock_backend_enabled")

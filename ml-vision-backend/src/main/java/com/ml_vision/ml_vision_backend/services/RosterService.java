@@ -8,6 +8,7 @@ import com.ml_vision.ml_vision_backend.repositories.CourseClassRosterRepository;
 import com.ml_vision.ml_vision_backend.repositories.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -23,6 +24,7 @@ public class RosterService {
         return rosterRepo.findStudentsByCourseClassId(classId);
     }
 
+    @Transactional
     public void addStudent(String classId, String externalId) {
         CourseClass cls = classRepo.findById(classId)
                 .orElseThrow(() -> new RuntimeException("Class not found"));
@@ -30,7 +32,7 @@ public class RosterService {
         Student student = studentRepo.findByExternalId(externalId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        boolean exists = rosterRepo.existsByCourseClassIdAndStudentExternalId(classId, externalId);
+        boolean exists = rosterRepo.existsByCourseClass_IdAndStudent_ExternalId(classId, externalId);
         if (exists)
             return;
 
@@ -41,7 +43,8 @@ public class RosterService {
         rosterRepo.save(row);
     }
 
+    @Transactional
     public void removeStudent(String classId, String externalId) {
-        rosterRepo.deleteByCourseClassIdAndStudentExternalId(classId, externalId);
+        rosterRepo.deleteByCourseClass_IdAndStudent_ExternalId(classId, externalId);
     }
 }
