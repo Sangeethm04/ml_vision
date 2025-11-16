@@ -64,44 +64,36 @@ export default function LiveAttendance() {
   }, []);
 
   const handleCaptureFrame = async () => {
-    if (!videoRef.current || !selectedClass) return;
+  if (!videoRef.current || !selectedClass) return;
 
-    if (isProcessing) return;
-    setIsProcessing(true);
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(videoRef.current, 0, 0);
-      
-      const blob = await new Promise<Blob>((resolve) => 
-        canvas.toBlob((b) => resolve(b!), 'image/jpeg')
-      );
-      
-      const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
-      const result = await attendanceApi.submitFrame(file, selectedClass);
+  setIsProcessing(true);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(videoRef.current, 0, 0);
 
-      setRecognized(result.recognized);
-      await Promise.all(
-        result.recognized.map((student) =>
-          attendanceApi.mark({
-            classId: selectedClass,
-            studentId: student.student_id,
-            confidence: student.confidence,
-          })
-        )
-      );
-      toast({ 
-        title: `Recognized ${result.recognized.length} student(s)`,
-        description: "Attendance marked successfully"
-      });
-    } catch (error) {
-      toast({ title: "Failed to process frame", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((b) => resolve(b!), 'image/jpeg')
+    );
+
+    const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
+
+    const result = await attendanceApi.submitFrame(file, selectedClass);
+
+    setRecognized(result.recognized);
+    toast({
+      title: `Recognized ${result.recognized.length} student(s)`,
+      description: "Attendance marked successfully"
+    });
+  } catch (error) {
+    toast({ title: "Failed to process frame", variant: "destructive" });
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
 
   return (
     <div className="container mx-auto p-6 space-y-6">

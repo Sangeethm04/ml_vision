@@ -1,10 +1,15 @@
 package com.ml_vision.ml_vision_backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
 public class MlRecognizedStudent {
-    private String student_id;
+
+    @JsonProperty("student_id")
+    private String studentId;
+
     private double confidence;
+
     private String position;
 }

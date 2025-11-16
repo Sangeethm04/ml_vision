@@ -18,7 +18,7 @@ public class StudentService {
 
     private final StudentRepository studentRepository;
 
-    private static final String UPLOAD_DIR = "uploads/student_photos/";
+    private static final String RELATIVE_UPLOAD_DIR = "/uploads/student_photos/";
 
     public Student createStudent(
             String firstName,
@@ -27,19 +27,15 @@ public class StudentService {
             String email,
             MultipartFile photo) {
 
-        String photoUrl = null;
+        Student student = new Student();
+        student.setFirstName(firstName);
+        student.setLastName(lastName);
+        student.setExternalId(externalId);
+        student.setEmail(email);
 
         if (photo != null && !photo.isEmpty()) {
-            photoUrl = savePhoto(photo);
+            student.setPhotoUrl(savePhoto(photo));
         }
-
-        Student student = Student.builder()
-                .firstName(firstName)
-                .lastName(lastName)
-                .externalId(externalId)
-                .email(email)
-                .photoUrl(photoUrl)
-                .build();
 
         return studentRepository.save(student);
     }
@@ -60,10 +56,8 @@ public class StudentService {
         student.setExternalId(externalId);
         student.setEmail(email);
 
-        // If a new photo is uploaded, replace old one
         if (photo != null && !photo.isEmpty()) {
-            String newPhotoUrl = savePhoto(photo);
-            student.setPhotoUrl(newPhotoUrl);
+            student.setPhotoUrl(savePhoto(photo));
         }
 
         return studentRepository.save(student);
@@ -82,37 +76,30 @@ public class StudentService {
         studentRepository.deleteById(id);
     }
 
-    // ----------------------
-    // PHOTO HANDLING
-    // ----------------------
-
     private String savePhoto(MultipartFile file) {
-
         try {
-            // Absolute path: write to project root
             String rootDir = System.getProperty("user.dir");
-            String fullUploadPath = rootDir + "/uploads/student_photos/";
+            String fullUploadPath = rootDir + RELATIVE_UPLOAD_DIR;
 
-            // Ensure directories exist
             Files.createDirectories(Paths.get(fullUploadPath));
 
-            String extension = getExtension(file.getOriginalFilename());
-            String filename = UUID.randomUUID() + extension;
+            String ext = getExtension(file.getOriginalFilename());
+            String fileName = UUID.randomUUID() + ext;
 
-            File dest = new File(fullUploadPath + filename);
+            File dest = new File(fullUploadPath + fileName);
             file.transferTo(dest);
 
-            // URL for frontend
-            return "/uploads/student_photos/" + filename;
+            return RELATIVE_UPLOAD_DIR + fileName;
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to save photo", e);
         }
     }
 
-    private String getExtension(String filename) {
-        if (filename == null || !filename.contains("."))
+    private String getExtension(String name) {
+        if (name == null || !name.contains(".")) {
             return ".jpg";
-        return filename.substring(filename.lastIndexOf("."));
+        }
+        return name.substring(name.lastIndexOf("."));
     }
 }
