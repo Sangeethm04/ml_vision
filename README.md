@@ -92,10 +92,11 @@ pytest==8.2.0
 
 ### Core modules
 
-* `capture.FrameCapture`: opens camera/video/directory and yields frames (with optional `--preview` window).
+* `capture.FrameCapture`: opens camera/video/directory and yields frames. Use CLI flags like `--preview`, `--process-scale`, `--frame-skip`, and `DEDUPE_SECONDS` to tune performance.
 * `recognizer.FaceRecognizer` + `DeduplicatingRecognizer`: loads roster encodings and filters duplicates.
 * `api_client.AttendanceApiClient`: wraps REST requests with retries + duplicate handling.
-* `main`: CLI entry; accepts flags like `--session-id`, `--source`, `--mock-recognizer`, and `--dry-run`.
+* `main`: CLI entry; accepts flags like `--session-id`, `--source`, `--mock-recognizer`, `--dry-run`, etc.
+* `server`: Flask service exposing `/health` and `/recognize` so browsers/mobile clients can upload frames directly to Python and receive recognition results.
 
 Minimal attendance payload:
 
@@ -110,6 +111,15 @@ payload = {
 api_client.mark_attendance(payload)
 ```
 
+### Running Modes
+
+* **Agent mode** (webcam → Spring API):  
+  `python -m python_vision.main --session-id <uuid> --source 0 --preview --process-scale 0.5 --frame-skip 3`
+* **Flask API mode** (front end uploads frames to Python, then calls Spring to persist):  
+  `python -m python_vision.server` (listens on `http://localhost:5001`)
+* **Dry run**:  
+  `python -m python_vision.main --dry-run --mock-recognizer --source 0`
+
 ### Workflow
 
 1. `main.py` loads `.env` for `API_BASE_URL`, `API_TOKEN`, camera config.
@@ -120,7 +130,7 @@ api_client.mark_attendance(payload)
 
 ### Testing Guidelines
 
-* Run `pytest` inside `python-vision`; dedupe + config tests are included.
+* Run `pytest` inside `python-vision`; dedupe + config tests are included. Extra debug logs (`recognizer.match_result`) will help inspect recognition distances.
 * Extend coverage with API mocks (`responses`) and prerecorded frames as needed.
 
 ---
@@ -195,15 +205,19 @@ public class AttendanceController {
 4. **Configure Python app**:
    * `.env` with `API_BASE_URL`, `API_KEY`, `SESSION_ID`, camera config.
    * Preload embeddings referencing student IDs (download from API or maintain offline mapping).
-5. **Run Python agent**:
-   * Real mode: `python -m python_vision.main --session-id <uuid> --source camera --preview`.
-   * Offline/dry-run (no Spring API needed): `python -m python_vision.main --dry-run --mock-recognizer --source camera`.
-6. **Front-end (future)**: call `/api/sessions`, `/api/attendance`, subscribe to SSE for live updates.
+5. **Run Python services** (pick what you need):
+   * Agent pushing directly to Spring: `python -m python_vision.main --session-id <uuid> --source camera --preview --process-scale 0.5 --frame-skip 2`.
+   * Flask recognition API for the front end: `python -m python_vision.server` (front end posts frames to `/recognize`).
+   * Dry run: `python -m python_vision.main --dry-run --mock-recognizer --source camera`.
+6. **Front-end**:
+   * Configure `VITE_API_BASE_URL` (Spring API) and `VITE_VISION_BASE_URL` (Flask server) in `ml-vision-frontend/.env`.
+   * `attendanceApi.submitFrame` now posts to the Flask `/recognize` endpoint, then calls Spring’s `/attendance/mark` for each recognized student.
+   * Use React Query polling or WebSockets (future) to reflect updates live.
 
 Error handling guidelines:
 
 * Python agent caches attendance events locally and retries when API/network recovers.
-* API returns 409 for duplicate attendance; Python agent should treat as success.
+* API returns 409 for duplicate attendance; Python agent should treat as success (or set `DEDUPE_SECONDS=0` when you want to post every frame).
 * Use correlation IDs (`X-Request-Id`) for tracing across services.
 
 ---

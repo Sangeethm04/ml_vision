@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Camera, Square, PlayCircle, CheckCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ export default function LiveAttendance() {
   const [recognized, setRecognized] = useState<RecognizedStudent[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const captureInterval = useRef<number>();
   const { toast } = useToast();
 
   const { data: classes = [] } = useQuery({
@@ -34,6 +35,9 @@ export default function LiveAttendance() {
         videoRef.current.srcObject = stream;
       }
       setIsCapturing(true);
+      captureInterval.current = window.setInterval(() => {
+        handleCaptureFrame();
+      }, 1000); // every 1s
       toast({ title: "Camera started" });
     } catch (error) {
       toast({ title: "Failed to access camera", variant: "destructive" });
@@ -45,13 +49,24 @@ export default function LiveAttendance() {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
     }
+    if (captureInterval.current) {
+      clearInterval(captureInterval.current);
+      captureInterval.current = undefined;
+    }
     setIsCapturing(false);
     setRecognized([]);
   };
 
+  useEffect(() => {
+    return () => {
+      if (captureInterval.current) clearInterval(captureInterval.current);
+    };
+  }, []);
+
   const handleCaptureFrame = async () => {
     if (!videoRef.current || !selectedClass) return;
-    
+
+    if (isProcessing) return;
     setIsProcessing(true);
     try {
       const canvas = document.createElement('canvas');
@@ -66,8 +81,17 @@ export default function LiveAttendance() {
       
       const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
       const result = await attendanceApi.submitFrame(file, selectedClass);
-      
+
       setRecognized(result.recognized);
+      await Promise.all(
+        result.recognized.map((student) =>
+          attendanceApi.mark({
+            classId: selectedClass,
+            studentId: student.student_id,
+            confidence: student.confidence,
+          })
+        )
+      );
       toast({ 
         title: `Recognized ${result.recognized.length} student(s)`,
         description: "Attendance marked successfully"
