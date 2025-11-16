@@ -242,3 +242,12 @@ Error handling guidelines:
 3. Flesh out the OpenAPI contract (Spring doc already wired) and share with the upcoming front-end.
 4. Add CI (GitHub Actions) to run `pytest` + `mvn test`, and wire deployment scripts (Docker Compose/K8s) when ready.
 5. Iterate on the recognition threshold/lighting setup before rolling into a real classroom.
+
+# HOW TO INSTALL PYTHON ON ANOTHER COMPUTER
+cd /path/to/ml_vision/python-vision
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export PYTHONPATH=src
+python -m python_vision.main --help
+
