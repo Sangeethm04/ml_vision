@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import time
 from datetime import datetime, timezone
 
@@ -35,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=2,
         help="Only run recognition on every Nth frame (preview still shows every frame)",
+    )
+    parser.add_argument(
+        "--preview-retain",
+        type=float,
+        default=2.0,
+        help="Seconds to keep the last bounding boxes visible when no new matches are processed",
     )
     return parser
 
@@ -77,6 +84,8 @@ def run() -> None:
 
     frame_counter = 0
     frame_skip = max(1, args.frame_skip)
+    last_preview_matches: list[RecognitionResult] = []
+    last_preview_time = 0.0
 
     with FrameCapture(frame_source) as capture:
         for frame in capture.frames():
@@ -100,9 +109,15 @@ def run() -> None:
                             int(bottom / scale_factor),
                             int(left / scale_factor),
                         )
+            preview_matches = matches
+            if matches:
+                last_preview_matches = [copy.deepcopy(m) for m in matches]
+                last_preview_time = now
+            elif args.preview and last_preview_matches and (now - last_preview_time) < args.preview_retain:
+                preview_matches = last_preview_matches
 
             if args.preview:
-                if not show_preview_frame(frame, matches):
+                if not show_preview_frame(frame, preview_matches):
                     logger.info("agent.preview_exit")
                     break
 
