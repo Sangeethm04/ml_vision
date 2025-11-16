@@ -11,13 +11,18 @@ from dotenv import load_dotenv
 
 @dataclass
 class Settings:
-    """Runtime configuration loaded from the environment."""
+    """Strongly-typed view of the .env file so the rest of the app can rely on one source of truth."""
 
+    # Which class session attendance should be attached to when we POST to Spring
     session_id: str
+    # Folder containing the roster photos that get turned into embeddings
     roster_dir: Path
+    # Camera index, video path, or folder of stills used for capture
     frame_source: str
+    # Connectivity info for the Spring API (skipped when running in --dry-run mode)
     api_base_url: str = field(default="")
     api_key: str = field(default="")
+    # Face-recognition threshold and duplicate suppression window
     min_confidence: float = 0.5
     dedupe_seconds: int = 120
 
@@ -29,6 +34,7 @@ class Settings:
         load_dotenv(env_path)
 
         def read_env(name: str, default: Optional[str] = None, required: bool = True) -> str:
+            """Helper that centralises error handling / defaults for env vars."""
             import os
 
             value = os.getenv(name)

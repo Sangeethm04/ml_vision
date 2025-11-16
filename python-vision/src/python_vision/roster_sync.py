@@ -30,6 +30,10 @@ def sync_roster(settings: Settings) -> int:
     `settings.roster_dir` as {externalId}.jpg so the recognizer can load them.
     Returns the number of photos written.
     """
+    if not settings.api_base_url:
+        logger.info("roster_sync.skip_no_api")
+        return 0
+
     base = settings.api_base_url.rstrip("/")
     students_url = f"{base}/api/students"
     _ensure_dir(settings.roster_dir)
@@ -48,7 +52,11 @@ def sync_roster(settings: Settings) -> int:
         logger.error("roster_sync.fetch_failed", url=students_url, error=str(exc))
         return 0
 
-    students: Iterable[dict] = resp.json() or []
+    try:
+        students: Iterable[dict] = resp.json() or []
+    except ValueError as exc:  # pragma: no cover - malformed response
+        logger.error("roster_sync.json_failed", url=students_url, error=str(exc), body=resp.text[:200])
+        return 0
     written = 0
     for student in students:
         external_id = student.get("externalId")

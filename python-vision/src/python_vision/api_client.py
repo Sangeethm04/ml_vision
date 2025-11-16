@@ -32,7 +32,7 @@ class AttendancePayload:
 
 
 class AttendanceApiClient:
-    """Thin wrapper around the Spring REST API."""
+    """Thin wrapper around the Spring REST API used by the CLI agent."""
 
     def __init__(self, base_url: str, api_key: str, timeout_seconds: int = 10) -> None:
         self.base_url = base_url.rstrip("/")
@@ -41,10 +41,12 @@ class AttendanceApiClient:
         self.session = requests.Session()
 
     def _headers(self) -> Dict[str, str]:
+        # All Spring endpoints expect the shared API key for simple auth
         return {"X-API-Key": self.api_key, "Content-Type": "application/json"}
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential_jitter(initial=2, max=10))
     def mark_attendance(self, payload: AttendancePayload) -> Dict[str, Any]:
+        """Send a single attendance record to Spring, retrying on transient network errors."""
         url = f"{self.base_url}/api/attendance"
         logger.info(
             "api_client.mark_attendance",
@@ -60,6 +62,7 @@ class AttendanceApiClient:
         return response.json()
 
     def fetch_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Utility endpoint used by the CLI to validate the target session before posting."""
         url = f"{self.base_url}/api/sessions/{session_id}"
         response = self.session.get(url, headers=self._headers(), timeout=self.timeout_seconds)
         if response.status_code == 404:

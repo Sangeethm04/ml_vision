@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/api/camera")
 @RequiredArgsConstructor
@@ -25,7 +27,9 @@ public class CameraController {
 
     @PostMapping("/frame")
     public ResponseEntity<?> submitFrame(@RequestParam("image") MultipartFile image,
-            @RequestParam("classId") String classId) throws Exception {
+            @RequestParam("classId") String classId,
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            @RequestParam(value = "sessionStartedAt", required = false) String sessionStartedAtIso) throws Exception {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("image", new MultipartInputStreamFileResource(
@@ -44,8 +48,16 @@ public class CameraController {
         MlRecognizeResponse recognized = resp.getBody();
 
         if (recognized != null && recognized.getRecognized() != null) {
+            LocalDateTime sessionStartedAt = null;
+            if (sessionStartedAtIso != null && !sessionStartedAtIso.isBlank()) {
+                try {
+                    sessionStartedAt = LocalDateTime.parse(sessionStartedAtIso);
+                } catch (Exception ignored) {
+                    // fall back to null if parsing fails
+                }
+            }
             for (MlRecognizedStudent s : recognized.getRecognized()) {
-                attendanceService.recordAttendance(classId, s);
+                attendanceService.recordAttendance(classId, sessionId, sessionStartedAt, s);
             }
         }
 

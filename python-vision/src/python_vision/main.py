@@ -13,7 +13,7 @@ import cv2
 from .api_client import AttendanceApiClient, AttendancePayload
 from .capture import FrameCapture
 from .config import Settings
-from .recognizer import DeduplicatingRecognizer, FaceRecognizer
+from .recognizer import DeduplicatingRecognizer, FaceRecognizer, RecognitionResult
 from .roster_sync import sync_roster
 
 logger = structlog.get_logger(__name__)
@@ -48,6 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def show_preview_frame(frame, matches):
+    """Draw bounding boxes + labels on top of the live feed so audiences can see detections."""
     display = frame.copy()
     for match in matches:
         if not match.box:
@@ -62,6 +63,7 @@ def show_preview_frame(frame, matches):
 
 
 def run() -> None:
+    """Main entry point wired up to the CLI flags."""
     args = build_parser().parse_args()
     settings = Settings.load(require_api=not args.dry_run)
     session_id = args.session_id or settings.session_id
@@ -91,6 +93,7 @@ def run() -> None:
     last_preview_matches: list[RecognitionResult] = []
     last_preview_time = 0.0
 
+    # Start the capture loop (webcam/video/folder) and push frames through the recognizer
     with FrameCapture(frame_source) as capture:
         for frame in capture.frames():
             frame_counter += 1

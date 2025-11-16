@@ -20,8 +20,11 @@ logger = structlog.get_logger(__name__)
 
 @dataclass
 class RecognitionResult:
+    # ID we report back to Spring (drawn from photo filename prefix)
     student_id: str
+    # 0..1 confidence which the UI uses for progress bars
     confidence: float
+    # Original face bounding box (top, right, bottom, left) so preview windows can draw overlays
     box: Optional[Tuple[int, int, int, int]] = None
 
 
@@ -76,6 +79,7 @@ class FaceRecognizer:
             yield path
 
     def identify(self, frame) -> List[RecognitionResult]:
+        """Find faces, compare embeddings, and return any matches for the current frame."""
         if self.use_mock_backend:
             return []
         frame_id = id(frame)

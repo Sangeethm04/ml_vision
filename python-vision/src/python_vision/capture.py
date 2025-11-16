@@ -14,14 +14,14 @@ FrameSource = Union[int, str]
 
 
 class FrameCapture:
-    """Yields frames from a webcam, video file, or directory of images."""
+    """Single abstraction around all the ways we might receive pixels (webcam, file, folder)."""
 
     def __init__(self, source: FrameSource) -> None:
         self.source = source
         self._video = None
 
     def frames(self) -> Generator:
-        """Yield frames as numpy arrays."""
+        """Yield frames as numpy arrays, routing to the correct private implementation."""
         if isinstance(self.source, int) or (isinstance(self.source, str) and self.source.isdigit()):
             yield from self._frames_from_camera(int(self.source))
             return
