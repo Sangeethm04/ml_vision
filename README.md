@@ -6,7 +6,21 @@ This monorepo includes the full stack: a modern React frontend, a Spring Boot ba
 ---
 
 ## 💻 Preview
-[ML_VISION.pdf](https://github.com/user-attachments/files/23944759/ML_VISION.pdf)
+
+### Dashboard
+![Dashboard](docs/screenshots/slide_1.png)
+
+### Tech Stack
+![Tech Stack](docs/screenshots/slide_2.png)
+
+### Real-Time Facial Recognition
+![Facial Recognition](docs/screenshots/slide_3.png)
+
+### Attendance Reports
+![Reports](docs/screenshots/slide_4.png)
+
+### Student Management
+![Students](docs/screenshots/slide_5.png)
 
 ---
 
