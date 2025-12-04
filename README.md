@@ -5,6 +5,12 @@ This monorepo includes the full stack: a modern React frontend, a Spring Boot ba
 
 ---
 
+## 💻 Preview
+[ML_VISION.pdf](https://github.com/user-attachments/files/23944759/ML_VISION.pdf)
+
+---
+
+
 ## Repository Structure
 - **ml-vision-frontend/** — React + Vite UI (Shadcn UI, TailwindCSS)  
 - **ml-vision-backend/** — Spring Boot REST API + PostgreSQL  
