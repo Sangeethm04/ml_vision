@@ -1,7 +1,6 @@
 # ML Vision – AI-Powered Attendance Platform
 
-ML Vision automates classroom attendance using real-time facial recognition.  
-This monorepo includes the full stack: a modern React frontend, a Spring Boot backend, and a Python vision engine powered by OpenCV + face_recognition.
+ML Vision reimagines classroom attendance using AI and computer vision. Instead of roll calls or manual check-ins, the system continuously analyzes live video, recognizes students, and records attendance automatically, down to the timestamp and confidence level. The platform brings together a modern React interface, a robust Spring Boot backend, and a real-time Python vision service, delivering an intuitive and automated attendance experience for both instructors and students.
 
 ---
 
